@@ -1,14 +1,29 @@
 module Fetch
   def search(s,page)
-    url1 = "http://www.omdbapi.com/?y=&plot=short&r=json&s=#{s}&page=#{page}"
-    resp1 = Typhoeus.get(url1, followlocation: true)
-    json1 = JSON.parse(resp1.body)
-    arr = json1['Search']
+    url = url_for_search(s,page)
+    arr = JSON.parse(get_data(url).body)['Search']
+    merge_actors(arr)
+  end
+
+  private
+
+  def url_for_search(s,page)
+    "http://www.omdbapi.com/?y=&plot=short&r=json&s=#{s}&page=#{page}"
+  end
+
+  def url_for_id(id)
+    "http://www.omdbapi.com/?plot=short&r=json&i=#{id}"
+  end
+
+  def get_data(url)
+    Typhoeus.get(url, followlocation: true)
+  end
+
+  def merge_actors(arr)
     arr.map do |entry|
-      url2 = "http://www.omdbapi.com/?plot=short&r=json&i=#{entry['imdbID']}"
-      resp2 = Typhoeus.get(url2, followlocation: true)
-      json2 = JSON.parse(resp2.body)
-      entry.merge(json2)
+      url = url_for_id(entry['imdbID'])
+      json = JSON.parse(get_data(url).body)
+      entry.merge(json)
     end
   end
 end
