@@ -1,39 +1,31 @@
 class ImdbReader
+
+  include Fetch
+
   def initialize(s,num_of_pages=1)
     num_of_pages.times do |page|
-      build_page(s,page+1)
+      arr = search(s,page+1)
+      build_page(arr)
     end
   end
 
-  def build_page(s,page)
-    url = "http://www.omdbapi.com/?y=&plot=short&r=json&s=#{s}&page=#{page}"
-    resp = Typhoeus.get(url, followlocation: true)
-    json = JSON.parse(resp.body)
-    arr = json['Search']
+  def build_page(arr)
     arr.each do |entry|
-      movie = Movie.where(imdbId: entry['imdbID'])[0]
-      unless movie
-        movie = Movie.new
+      movie = Movie.find_or_initialize_by(imdbId: entry['imdbID'])
+      unless movie.id
         movie.title = entry['Title']
-        movie.imdbId = entry['imdbID']
-        load_details(movie)
+        movie.director = entry['Director']
+        movie.plot = entry['Plot']
+        movie.rating = entry['imdbRating']
+        movie.save
       end
+      actors = entry['Actors'] || ''
+      load_actors(movie,actors)
     end
   end
 
-  def load_details(movie)
-    url = "http://www.omdbapi.com/?plot=short&r=json&i=#{movie.imdbId}"
-    resp = Typhoeus.get(url, followlocation: true)
-    json = JSON.parse(resp.body)
-    movie.director = json['Director']
-    movie.plot = json['Plot']
-    movie.rating = json['imdbRating']
-    movie.save
-    load_actors(movie,json)
-  end
-
-  def load_actors(movie,json)
-    arr = json['Actors'].gsub(/ *, */, ',').split(',')
+  def load_actors(movie,actors)
+    arr = actors.split(',').map(&:strip)
     arr.each do |entry|
       actor = Actor.find_or_initialize_by(name: entry)
       actor.save unless actor.id
